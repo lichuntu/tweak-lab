@@ -1,0 +1,31 @@
+name: build-dylib
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 打印可用 Xcode 与 SDK
+        run: |
+          echo "=== /Applications ==="
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "(none)"
+          echo "=== xcodes ==="
+          xcodebuild -version || true
+          echo "=== iOS SDKs ==="
+          ls /Applications/Xcode*.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/ 2>/dev/null || true
+
+      - name: 编译 dylib
+        run: bash ./build.sh
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinTweak-dylib
+          path: build/*.dylib
+          if-no-files-found: error
