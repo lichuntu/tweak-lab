@@ -124,13 +124,24 @@ static UITextView *gText = nil;
 - (void)handleLongPress;
 @end
 
+static NSArray<UIWindow *> *MTAllWindows(void) {
+    NSMutableArray<UIWindow *> *out = [NSMutableArray array];
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if ([scene isKindOfClass:UIWindowScene.class])
+            [out addObjectsFromArray:((UIWindowScene *)scene).windows];
+    }
+    return out;
+}
+
+static UIWindow *MTKeyWindow(void) {
+    NSArray<UIWindow *> *all = MTAllWindows();
+    for (UIWindow *w in all) if (w.isKeyWindow) return w;
+    return all.firstObject;
+}
+
 static UIWindow *MTProbeWindow(void) {
     if (gProbeWindow) return gProbeWindow;
-    UIWindow *host = nil;
-    for (UIWindow *w in [UIApplication sharedApplication].windows) {
-        if (w.isKeyWindow) { host = w; break; }
-    }
-    if (!host) host = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *host = MTKeyWindow();
     if (!host) return nil;
 
     UIWindow *win = nil;
@@ -161,7 +172,14 @@ static UIWindow *MTProbeWindow(void) {
 - (void)install {
     if (gBall) return;
     UIWindow *win = MTProbeWindow();
-    if (!win) { MT_LOG(@"探针: 没有可用窗口，稍后重试"); return; }
+    if (!win) {
+        static int retry = 0;
+        if (retry++ < 20) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{ [self install]; });
+        }
+        return;
+    }
     UIView *host = win.rootViewController.view;
 
     UIView *ball = [[UIView alloc] initWithFrame:CGRectMake(10, 140, 46, 46)];
@@ -219,7 +237,7 @@ static UIWindow *MTProbeWindow(void) {
     UIView *host = win.rootViewController.view;
 
     UIWindow *key = nil;
-    for (UIWindow *w in [UIApplication sharedApplication].windows) {
+    for (UIWindow *w in MTAllWindows()) {
         if (w != gProbeWindow && w.isKeyWindow) { key = w; break; }
     }
     UIView *target = key ?: host;
